@@ -47,6 +47,10 @@ base_pkgs <- function() {
   c("R", utils::installed.packages(priority = "base")[, "Package"])
 }
 
+.callr <- as.list(getNamespace("callr"), all.names = TRUE)[c(
+  "default_load_hook"
+)]
+
 .tools <- as.list(getNamespace("tools"), all.names = TRUE)[c(
   ".split_dependencies"
 )]
@@ -197,6 +201,13 @@ fetch_package_source <- function(archive_url, destdir) {
   }
 }
 
+.package_dependencies <- function(packages = NULL, ...) {
+  if (length(packages) == 0) {
+    NULL
+  } else {
+    tools::package_dependencies(packages = packages, ...)
+  }
+}
 
 #' @import cli
 "_PACKAGE"

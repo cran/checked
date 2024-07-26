@@ -62,8 +62,8 @@ check_process <- R6::R6Class(
       if (!self$is_alive()) callback()
     },
     finalize = function() {
-      path <- file.path(private$check_dir, "result.json")
-      rcmdcheck_to_json(self$parse_results(), path)
+      self$poll_output()
+      self$save_results()
       if (is.function(f <- private$finalize_callback)) f(self)
       if ("finalize" %in% ls(super)) super$finalize()
     },
@@ -96,13 +96,20 @@ check_process <- R6::R6Class(
 
       if (!self$is_alive()) {
         private$time_last_check_start <- NULL
-        private$time_finish <- Sys.time()
+        private$time_finish <- private$time_finish %||% Sys.time()
       }
-
-      out <- paste0(
+      
+      # TODO: For some reason we need to read the output twice, otherwise
+      # it might not be captured.
+      # When forcing interruption, finalizer is called, hence try() to make
+      # sure it does not break after process is killed
+      out <- try(paste0(
         private$parsed_partial_check_output,
+        paste(super$read_output_lines(), collapse = "\n"),
         paste(super$read_output_lines(), collapse = "\n")
-      )
+      ), silent = TRUE)
+      
+      if (inherits(out, "try-error")) return()
 
       captures <- checks_capture(out)
       checks <- checks_simplify(captures)
@@ -125,6 +132,13 @@ check_process <- R6::R6Class(
         # the final check was fully parsed
         private$parsed_partial_check_output <- ""
       }
+    },
+    get_r_exit_status = function() {
+      as.integer(inherits(try(self$get_result(), silent = TRUE), "try-error"))
+    },
+    save_results = function() {
+      path <- file.path(private$check_dir, "result.json")
+      try(rcmdcheck_to_json(self$parse_results(), path), silent = TRUE)
     }
   ),
   private = list(
@@ -212,19 +226,4 @@ checks_simplify <- function(x) {
   checks <- trimws(x[, "status"])
   names(checks) <- trimws(x[, "check"])
   checks
-}
-
-#' Message if isolation impossible
-#' 
-#' If _R_CHECK_SUGGESTS_ONLY_ is set to true, R CMD check will isolate package 
-#' installation into temporary directory for running tests and examples. However,
-#' isolation is not applied to dependencies installed in the R_HOME library.
-#' The function informs about possible isolation problem if there are any non
-#' base/recommended packages installed in the .Library (R_HOME).
-message_possible_isolation_problems <- function() {
-  ip_home <- utils::installed.packages(lib.loc = .Library)
-  if (any(is.na(ip_home[, "Priority"]))) {
-    message("Non-standard packages identified under R_HOME (.Library) library. ",
-            "R CMD check might not be able to isolate dependencies while running.")
-  }
 }

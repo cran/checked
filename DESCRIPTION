@@ -1,6 +1,6 @@
 Package: checked
 Title: Systematically Run R CMD Checks
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: 
     c(
       person(
@@ -25,6 +25,8 @@ Description:
     Systematically Run R checks against multiple packages. Checks are run in 
     parallel with strategies to minimize dependency installation. Provides
     out of the box interface for running reverse dependency check.
+URL: https://github.com/Genentech/checked
+BugReports: https://github.com/Genentech/checked/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
 Imports: callr, cli, igraph, jsonlite, R6, rcmdcheck, utils (>= 3.6.2),
@@ -34,10 +36,10 @@ Suggests: testthat (>= 3.0.0)
 Config/Needs/website: r-lib/asciicast
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2024-07-08 23:38:16 UTC; maksymis
+Packaged: 2024-07-26 01:49:25 UTC; maksymis
 Author: Szymon Maksymiuk [cre, aut] (<https://orcid.org/0000-0002-3120-1601>),
   Doug Kelkhoff [aut] (<https://orcid.org/0009-0003-7845-4061>),
   F. Hoffmann-La Roche AG [cph, fnd]
 Maintainer: Szymon Maksymiuk <sz.maksymiuk@gmail.com>
 Repository: CRAN
-Date/Publication: 2024-07-10 16:30:02 UTC
+Date/Publication: 2024-07-26 02:20:02 UTC
