@@ -1,5 +1,57 @@
-checked 0.2.0 
----------------------------------------------------------------
+# checked 0.2.4
+
+* Fix check processes hanging forever in some system configurations.
+
+* Remove all whitespaces (`"[[:space:]]"`) before comparing potential issues
+  to skip most of the false positives.
+
+* Shortened many user-facing function names. In general, uses of `reverse`
+  were shortened to `rev`, `dependencies` was shortened to `deps`,
+  `development` was shortened to `dev` and `package` was shortened to `pkg`.
+  For example, `check_reverse_dependencies_development()` was shortened to
+  `check_dev_rev_deps()` (@dgkf-roche)
+
+* Fix names in the `enum` function for R lower than 4.3.
+
+* Add tests for the reverse dependency check use case.
+
+* Make `install_packages_process` capture session's `available_packages_filters`
+  and reuse them when installing packages to ensure consistency with the main
+  session filtering.
+
+* Prettify output by stripping excessive new lines.
+
+* `checked` now depends on `options`
+
+* Expose `...` allowing customization of check subprocesses when creating checks df.
+
+* Force garbage collection before scheduling task, to make sure any already
+  finished processes are removed from the memory.
+
+# checked 0.2.3
+
+* Use custom `checked` `finisher`'s instead of the `processx` `finalizer`'s
+  when cleaning up finished processes to avoid executing callbacks when
+  objects are garbage collected.
+  
+* In `rev_dep_check_tasks_df` add custom package value for each check associated
+  with the release version of the package to make sure, the current release
+  version of the package is always fetched and installed.
+  
+* Prevent `results` from attempting to read results for unfinished checks.
+
+# checked 0.2.2
+
+* Clear some of the unused utils functions (`can_symlink`, `symlink_or_copy`).
+
+* Make sure output directory is always created.
+
+# checked 0.2.1 
+
+* Add `results_to_file` function.
+
+# checked 0.2.0 
+
 * Change default private `lib.loc` value in `check_process` R6 class
   to NULL to avoid staged installation failures.
   
@@ -25,6 +77,6 @@ checked 0.2.0
 
 * Fix race condition when reporting progress for check processes.
 
-checked 0.1.0
----------------------------------------------------------------
+# checked 0.1.0
+
 * Package released to CRAN

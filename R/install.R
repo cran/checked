@@ -1,3 +1,4 @@
+#' @importFrom utils packageName install.packages
 #' @importFrom R6 R6Class
 #' @importFrom callr r_process
 install_packages_process <- R6::R6Class(
@@ -5,26 +6,39 @@ install_packages_process <- R6::R6Class(
   inherit = callr::r_process,
   public = list(
     log = NULL,
-    initialize = function(pkgs, ..., lib = .libPaths(), libpaths = .libPaths(), log) {
+    initialize = function(
+      pkgs,
+      ...,
+      lib = .libPaths(),
+      libpaths = .libPaths(),
+      available_packages_filters = getOption("available_packages_filters"),
+      log
+    ) {
       private$package <- pkgs
       self$log <- log
       private$callr_r_bg(
-        function(...) {
+        function(..., escalate_warning, available_packages_filters) {
+          options(available_packages_filters = available_packages_filters)
           tryCatch(
             utils::install.packages(...),
             warning = function(w) {
-              installation_failure <- grepl("download of package .* failed", w$message) ||
-                grepl("(dependenc|package).*(is|are) not available", w$message) ||
-                grepl("installation of package.*had non-zero exit status", w$message) ||
-                grepl("installation of one or more packages failed", w$message)
-              
-              if (installation_failure) {
+              if (escalate_warning(w)) {
+                print(w$message)
                 stop(w$message)
+              } else {
+                print(w$message)
+                warning(w)
               }
             }
           )
         },
-        args = list(pkgs, ..., lib = lib),
+        args = list(
+          pkgs,
+          ...,
+          lib = lib,
+          escalate_warning = is_install_failure_warning,
+          available_packages_filters = available_packages_filters
+        ),
         libpath = libpaths,
         stdout = log,
         stderr = "2>&1",
@@ -37,14 +51,13 @@ install_packages_process <- R6::R6Class(
       }
       (private$time_finish %||% Sys.time()) - self$get_start_time()
     },
-    set_finalizer = function(callback) {
-      private$finalize_callback <- callback
-      if (!self$is_alive()) callback()
+    set_finisher = function(callback) {
+      private$finish_callback <- callback
+      if (!self$is_alive()) callback(self)
     },
-    finalize = function() {
+    finish = function() {
       private$time_finish <- Sys.time()
-      if (is.function(f <- private$finalize_callback)) f(self)
-      if ("finalize" %in% ls(super)) super$finalize()
+      if (is.function(f <- private$finish_callback)) f(self)
     },
     get_r_exit_status = function() {
       as.integer(inherits(try(self$get_result(), silent = TRUE), "try-error"))
@@ -53,7 +66,7 @@ install_packages_process <- R6::R6Class(
   private = list(
     options = NULL,
     package = NULL,
-    finalize_callback = NULL,
+    finish_callback = NULL,
     time_finish = NULL,
     callr_r_bg = function(...) {
       # default formal argument values
@@ -75,3 +88,18 @@ install_packages_process <- R6::R6Class(
     }
   )
 )
+
+is_install_failure_warning <- function(w) {
+  patterns <- c(
+    "download of package .* failed",
+    "(dependenc|package).*(is|are) not available",
+    "installation of package.*had non-zero exit status",
+    "installation of one or more packages failed",
+    "cannot open compressed file",
+    "(C|c)ouldn't connect to server",
+    "Timeout.*was reached"
+  )
+
+  re <- paste0("(", paste0(patterns, collapse = "|"), ")")
+  grepl(re, w$message)
+}

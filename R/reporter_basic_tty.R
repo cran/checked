@@ -22,13 +22,11 @@ report_status.reporter_basic_tty <- function(reporter, design, envir) { # nolint
   cli_theme()
   for (i in seq_along(igraph::V(design$graph))) {
     node <- igraph::V(design$graph)[[i]]
-    
+
     # skip if queued, but not started
     if (node$status <= STATUS$`pending`) next
-    
+
     p <- node$process
-    # NOTE: for some reason check process never finishes unless we poll checks
-    if (node$type == "check" && !is.null(p)) p$poll_output()
 
     # report stating of new checks
     if (!identical(node$status, reporter$statuses[[node$name]])) {

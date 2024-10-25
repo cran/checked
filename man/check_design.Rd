@@ -2,36 +2,45 @@
 % Please edit documentation in R/check_design.R
 \name{check_design}
 \alias{check_design}
-\title{Check Design Object}
+\title{\code{R6} Checks Coordinator}
 \description{
-Abstract object that drives all separate processes required to run
-R CMD check sequence.
+A stateful object that orchestrates all separate processes required to
+manage installation, library setup and run \verb{R CMD check}s in sequence.
 }
 \examples{
 \dontrun{
 library(checked)
 df <- source_check_tasks_df(c(
- system.file("example_packages", "exampleBad", package = "checked"),
- system.file("example_packages", "exampleGood", package = "checked")
+  system.file("example_packages", "exampleBad", package = "checked"),
+  system.file("example_packages", "exampleGood", package = "checked")
 ))
 
 plan <- check_design$new(df, n = 10, repos = "https://cran.r-project.org/")
 while (!plan$is_done()) {
- plan$start_next_task()
+  plan$start_next_task()
 }
 }
+
 }
+\seealso{
+Other checks: 
+\code{\link{check_dev_rev_deps}()},
+\code{\link{check_dir}()},
+\code{\link{check_pkgs}()},
+\code{\link{check_rev_deps}()},
+\code{\link{new_check_design}()}
+}
+\concept{checks}
 \section{Public fields}{
 \if{html}{\out{<div class="r6-fields">}}
 \describe{
 \item{\code{graph}}{(\code{igraph::igraph()})\cr
 A dependency graph, storing information about which dependencies
 are required prior to execution of each check task.
-Created with \code{\link[checked]{task_graph_create}}}
+Created with \code{\link[=task_graph_create]{task_graph_create()}}}
 
-\item{\code{input}}{(\code{data.fragme()})\cr
-Checks data.frame which is the source of all the checks
-Created with \code{\link[checked]{source_check_tasks_df}}}
+\item{\code{input}}{(\code{data.frame()})\cr
+Checks task \code{data.frame} which is the source of all the checks.}
 
 \item{\code{output}}{(\code{character(1)})\cr
 Output directory where raw results and temporary library will
@@ -67,7 +76,7 @@ and installation order are embedded.
   output = tempfile(paste(packageName(), Sys.Date(), sep = "-")),
   lib.loc = .libPaths(),
   repos = getOption("repos"),
-  restore = TRUE,
+  restore = options::opt("restore"),
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -75,24 +84,25 @@ and installation order are embedded.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{df}}{checks data.frame.}
+\item{\code{df}}{\code{check_design} data.frame.}
 
-\item{\code{n}}{integer value indicating maximum number of subprocesses that can
-be simultaneously spawned when executing tasks.}
+\item{\code{n}}{\code{integer} value indicating maximum number of subprocesses that
+can be simultaneously spawned when executing tasks.}
 
-\item{\code{output}}{character value specifying path where the output should be stored.}
+\item{\code{output}}{\code{character} value specifying path where the output should
+be stored.}
 
-\item{\code{lib.loc}}{character vector with libraries allowed to be used when
+\item{\code{lib.loc}}{\code{character} vector with libraries allowed to be used when
 checking packages, defaults to entire .libPaths().}
 
-\item{\code{repos}}{character vector of repositories which will be used when
+\item{\code{repos}}{\code{character} vector of repositories which will be used when
 generating task graph and later pulling dependencies.}
 
-\item{\code{restore}}{logical value, whether output directory should be unlinked
-before running checks. If FALSE, an attempt will me made to restore previous
-progress from the same \code{output}}
+\item{\code{restore}}{\code{logical} value, whether output directory should be
+unlinked before running checks. If \code{FALSE}, an attempt will me made to
+restore previous progress from the same \code{output}.}
 
-\item{\code{...}}{other parameters}
+\item{\code{...}}{Additional arguments unused}
 }
 \if{html}{\out{</div>}}
 }
@@ -124,7 +134,7 @@ Get Failed Tasks list
 \if{html}{\out{<a id="method-check_design-terminate"></a>}}
 \if{latex}{\out{\hypertarget{method-check_design-terminate}{}}}
 \subsection{Method \code{terminate()}}{
-Terminate Design Processes
+Kill All Active Design Processes
 
 Immediately terminates all the active processes.
 \subsection{Usage}{

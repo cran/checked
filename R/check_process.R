@@ -14,24 +14,6 @@ RE_CHECK <- paste0(
 )
 # nolint end, styler: on
 
-DEFAULT_R_CMD_CHECK_VARIABLES <- c( # nolint
-  "_R_CHECK_FORCE_SUGGESTS_" = FALSE,
-  "_R_CHECK_RD_XREFS_" = FALSE,
-  "_R_CHECK_SYSTEM_CLOCK_" = FALSE,
-  "_R_CHECK_SUGGESTS_ONLY_" = TRUE
-)
-
-DEFAULT_BUILD_ARGS <- c( # nolint
-  "--no-build-vignettes",
-  "--no-manual"
-)
-
-DEFAULT_CHECK_ARGS <- c( # nolint
-  "--timings",
-  "--ignore-vignettes",
-  "--no-manual"
-)
-
 #' @importFrom R6 R6Class
 #' @importFrom rcmdcheck rcmdcheck_process
 check_process <- R6::R6Class(
@@ -57,15 +39,14 @@ check_process <- R6::R6Class(
 
       super$initialize(...)
     },
-    set_finalizer = function(callback) {
-      private$finalize_callback <- callback
-      if (!self$is_alive()) callback()
+    set_finisher = function(callback) {
+      private$finish_callback <- callback
+      if (!self$is_alive()) callback(self)
     },
-    finalize = function() {
+    finish = function() {
       self$poll_output()
       self$save_results()
-      if (is.function(f <- private$finalize_callback)) f(self)
-      if ("finalize" %in% ls(super)) super$finalize()
+      if (is.function(f <- private$finish_callback)) f(self)
     },
     get_time_last_check_start = function() {
       private$time_last_check_start
@@ -98,18 +79,20 @@ check_process <- R6::R6Class(
         private$time_last_check_start <- NULL
         private$time_finish <- private$time_finish %||% Sys.time()
       }
-      
+
       # TODO: For some reason we need to read the output twice, otherwise
       # it might not be captured.
-      # When forcing interruption, finalizer is called, hence try() to make
+      # When forcing interruption, finisher is called, hence try() to make
       # sure it does not break after process is killed
       out <- try(paste0(
         private$parsed_partial_check_output,
         paste(super$read_output_lines(), collapse = "\n"),
         paste(super$read_output_lines(), collapse = "\n")
       ), silent = TRUE)
-      
-      if (inherits(out, "try-error")) return()
+
+      if (inherits(out, "try-error")) {
+        return()
+      }
 
       captures <- checks_capture(out)
       checks <- checks_simplify(captures)
@@ -149,7 +132,7 @@ check_process <- R6::R6Class(
     parsed_partial_check_output = "",
     throttle = NULL,
     spinners = NULL,
-    finalize_callback = NULL
+    finish_callback = NULL
   )
 )
 
@@ -161,6 +144,7 @@ check_process <- R6::R6Class(
 #'   returns a logical value indicating whether the throttle interval has
 #'   passed (TRUE if the interval has not yet passed).
 #'
+#' @keywords internal
 throttle <- function(interval = 0.2) {
   e <- environment()
   e$since <- Sys.time()
@@ -181,6 +165,7 @@ throttle <- function(interval = 0.2) {
 #'   ("OK", "NONE", "NOTE", "WARNING" or "ERROR").
 #'
 #' @examples
+#' \dontrun{
 #' check_output <- "
 #' * checking check one ... OK
 #' * checking check two ... NOTE
@@ -193,8 +178,9 @@ throttle <- function(interval = 0.2) {
 #' "
 #'
 #' checks_capture(check_output)
+#' }
 #'
-#' @export
+#' @keywords internal
 checks_capture <- function(x) {
   m <- gregexec(RE_CHECK, x, perl = TRUE)[[1]]
 
@@ -222,6 +208,7 @@ checks_capture <- function(x) {
 #' @param x Matrix of regex captures as produced by [checks_capture].
 #' @return A vector of check status, with names indicating the check
 #'
+#' @keywords internal
 checks_simplify <- function(x) {
   checks <- trimws(x[, "status"])
   names(checks) <- trimws(x[, "check"])
