@@ -1,3 +1,22 @@
+# checked 0.2.8
+
+* Unify notes, warnings and errors are internally stored when generating
+  results (R4.5 compatibility)
+  
+# checked 0.2.7
+
+* Fix a bug where wrong lib.loc was used to derive whether a package has already
+  been satisfied.
+  
+# checked 0.2.6
+
+* Save minimal version required by each edge and use them to properly identify
+  whether dependecy is satisfied when calling `task_graph_update_done`
+
+# checked 0.2.5
+
+* Refine reverse suggested dependecy strategy.
+
 # checked 0.2.4
 
 * Fix check processes hanging forever in some system configurations.

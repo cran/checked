@@ -100,11 +100,12 @@ task_edges_df <- function(df, repos) {
         empty_edge
       } else {
         deps <- split_packages_names(deps)
-        deps <- deps[deps %in% dependencies]
-        data.frame(
-          dep = deps,
-          root = rep(p, times = length(deps)),
-          type = rep(type, times = length(deps))
+        # Filter out base packages
+        deps <- deps[deps$dep %in% dependencies, ]
+        cbind(
+          deps,
+          root = rep(p, times = NROW(deps)),
+          type = rep(type, times = NROW(deps))
         )
       }
     })
@@ -112,7 +113,8 @@ task_edges_df <- function(df, repos) {
 
   edges$dep <- replace_with_map(edges$dep, custom_aliases_map$hash, custom_aliases_map$value)
   edges$root <- replace_with_map(edges$root, custom_aliases_map$hash, custom_aliases_map$value)
-  edges
+  # reorder columns to the igraph format
+  edges[, c("dep", "root", "type", "op", "version")]
 }
 
 task_vertices_df <- function(df, edges, repos) {
@@ -126,9 +128,25 @@ task_vertices_df <- function(df, edges, repos) {
     } else if (v %in% custom_pkgs_aliases) {
       df$custom[[utils::head(which(as.character(lapply(df$custom, `[[`, "alias")) == v), 1)]]
     } else {
+      e <- edges[edges$dep == v, ]
+      ver_order <- order(
+        e$version,
+        # In case of multiple requirements with the same version
+        # prioritize those using ">" operator
+        e$op,
+        na.last = TRUE,
+        decreasing = c(TRUE, FALSE),
+        method = "radix"
+      )
       install_task_spec(
         alias = v,
-        package_spec = package_spec(name = v, repos = repos)
+        package_spec = package_spec(
+          name = v,
+          repos = repos,
+          # Specify version requirements for dependencies
+          op = e$op[[ver_order[[1]]]],
+          version = e$version[[ver_order[[1]]]]
+        )
       )
     }
   })
@@ -193,7 +211,7 @@ task_graph_sort <- function(g) {
 
   # use only strong dependencies to prioritize by topology (leafs first)
   strong_edges <- igraph::E(g)[igraph::E(g)$type %in% DEP_STRONG]
-  g_strong <- igraph::subgraph.edges(g, strong_edges, delete.vertices = FALSE)
+  g_strong <- igraph::subgraph_from_edges(g, strong_edges, delete.vertices = FALSE)
   topo <- igraph::topo_sort(g_strong, mode = "in")
   priority_topo <- integer(length(g))
   priority_topo[match(topo$name, igraph::V(g)$name)] <- rev(seq_along(topo))
@@ -208,22 +226,23 @@ task_graph_sort <- function(g) {
 
 #' Find the Next Packages Not Dependent on an Unavailable Package
 #'
-#' While other packages are in progress, ensure that the next selected package
-#' already has its dependencies done.
-#'
+#' While other packages are in progress, identify tasks with all the
+#' dependencies done and mark them as \code{ready} already has its dependencies
+#' done.
+#' 
 #' @details
 #' There are helpers defined for particular use cases that strictly rely on the
-#' [`task_graph_which_satisfied()`], they are:
+#' [`task_graph_update_ready()`], they are:
 #'
-#' * `task_graph_which_satisfied_strong()` - List vertices whose strong
+#' * `task_graph_update_ready_strong()` - List vertices whose strong
 #'   dependencies are satisfied.
-#' * `task_graph_which_check_satisfied()` - List root vertices whose all
+#' * `task_graph_update_check_ready()` - List root vertices whose all
 #'   dependencies are satisfied.
-#' * `task_graph_which_install_satisfied()` - List install vertices whose
+#' * `task_graph_update_install_ready()` - List install vertices whose
 #'   dependencies are all satisfied
 #'
 #' @param g A dependency graph, as produced with [task_graph_create()].
-#' @param v Names or nodes objects of packages whose satisfiability should be
+#' @param v Names or nodes objects of packages whose readiness should be
 #' checked.
 #' @param dependencies Which dependencies types should be met for a node to be
 #' considered satisfied.
@@ -234,7 +253,7 @@ task_graph_sort <- function(g) {
 #'
 #' @importFrom igraph incident_edges tail_of
 #' @keywords internal
-task_graph_which_satisfied <- function(
+task_graph_update_ready <- function(
     g,
     v = igraph::V(g),
     dependencies = TRUE,
@@ -245,6 +264,7 @@ task_graph_which_satisfied <- function(
     idx <- v$status %in% status
     v <- v[idx]
   }
+
   deps_met <- vlapply(
     igraph::incident_edges(g, v, mode = "in"),
     function(edges) {
@@ -252,19 +272,25 @@ task_graph_which_satisfied <- function(
       all(igraph::tail_of(g, edges)$status == STATUS$done)
     }
   )
-  names(deps_met[deps_met])
+
+  task_graph_set_package_status(
+    g,
+    names(deps_met[deps_met]),
+    STATUS$ready
+  )
 }
 
-task_graph_which_satisfied_strong <- function(..., dependencies = "strong") { # nolint
-  task_graph_which_satisfied(..., dependencies = dependencies)
+task_graph_update_ready_strong <- function(..., dependencies = "strong") { # nolint
+  task_graph_update_ready(..., dependencies = dependencies)
 }
 
-task_graph_which_check_satisfied <- function(
+
+task_graph_update_check_ready <- function(
     g,
     ...,
     dependencies = "all",
     status = STATUS$pending) {
-  task_graph_which_satisfied(
+  task_graph_update_ready(
     g,
     igraph::V(g)[igraph::V(g)$type == "check"],
     ...,
@@ -273,18 +299,45 @@ task_graph_which_check_satisfied <- function(
   )
 }
 
-task_graph_which_install_satisfied <- function(
+task_graph_update_install_ready <- function(
     g,
     ...,
     dependencies = "strong",
     status = STATUS$pending) {
-  task_graph_which_satisfied(
+  task_graph_update_ready(
     g,
     igraph::V(g)[igraph::V(g)$type == "install"],
     ...,
     dependencies = dependencies,
     status = status
   )
+}
+
+
+#' Find task with ready state
+#'
+#' List tasks which have ready state prioritizing check tasks over
+#' install tasks.
+#'
+#' @param g A dependency graph, as produced with [task_graph_create()].
+#'
+#' @return The names of packages with ready state.
+#'
+#' @importFrom igraph incident_edges tail_of
+#' @keywords internal
+task_graph_which_ready <- function(g) {
+  ready_checks <- task_graph_get_package_with_status(
+    g,
+    igraph::V(g)[igraph::V(g)$type == "check"],
+    "ready"
+  )
+  ready_installs <- task_graph_get_package_with_status(
+    g,
+    igraph::V(g)[igraph::V(g)$type == "install"],
+    "ready"
+  )
+
+  c(ready_checks, ready_installs)
 }
 
 empty_edge <- data.frame(
@@ -304,6 +357,17 @@ task_graph_package_status <- function(g, v) {
 
 `task_graph_package_status<-` <- function(x, v, value) {
   task_graph_set_package_status(x, v, value)
+}
+
+`task_graph_package_status<-` <- function(x, v, value) {
+  task_graph_set_package_status(x, v, value)
+}
+
+task_graph_get_package_with_status <- function(g, v, status) {
+  if (is.character(status)) status <- STATUS[[status]]
+  statuses <- igraph::vertex.attributes(g, v)$status
+  
+  v[statuses == .env$status]
 }
 
 `task_graph_task_process<-` <- function(x, v, value) {
@@ -328,13 +392,29 @@ task_graph_set_task_process <- function(g, v, process) {
 }
 
 task_graph_update_done <- function(g, lib.loc) {
-  v <- igraph::V(g)[igraph::V(g)$type == "install"]
-  which_done <- which(vlapply(v$name, is_package_done, lib.loc = lib.loc))
+  custom_installs <- vlapply(
+    igraph::V(g)$spec,
+    inherits,
+    "custom_install_task_spec"
+  )
+  installs <- igraph::V(g)$type == "install" 
+  # custom install cannot be satisfied
+  v <- igraph::V(g)[installs & !custom_installs]
+  which_done <- which(vlapply(v$spec, is_package_satisfied, lib.loc = lib.loc))
   task_graph_set_package_status(g, v[which_done], STATUS$done)
 }
 
-is_package_done <- function(pkg, lib.loc) {  # nolint object_name_linter
-  path <- find.package(pkg, lib.loc = lib.loc, quiet = TRUE)
-  length(path) > 0
+is_package_satisfied <- function(v, lib.loc) {  # nolint object_name_linter
+  if (!is.null(v$package_spec$version)) {
+    installed_version <- tryCatch(
+      utils::packageVersion(v$package_spec$name, lib.loc = lib.loc),
+      error = function(e) {
+        numeric_version("0")
+      }
+    )
+    get(v$package_spec$op)(installed_version, v$package_spec$version)
+  } else {
+    FALSE
+  }
 }
 
