@@ -1,6 +1,6 @@
 Package: checked
 Title: Systematically Run R CMD Checks
-Version: 0.2.8
+Version: 0.2.9
 Authors@R: 
     c(
       person(
@@ -37,10 +37,11 @@ Suggests: testthat (>= 3.0.0), withr
 Config/Needs/website: r-lib/asciicast
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2025-04-29 09:24:59 UTC; maksymis
-Author: Szymon Maksymiuk [cre, aut] (<https://orcid.org/0000-0002-3120-1601>),
-  Doug Kelkhoff [aut] (<https://orcid.org/0009-0003-7845-4061>),
+Packaged: 2025-06-10 01:56:56 UTC; Szymon
+Author: Szymon Maksymiuk [cre, aut] (ORCID:
+    <https://orcid.org/0000-0002-3120-1601>),
+  Doug Kelkhoff [aut] (ORCID: <https://orcid.org/0009-0003-7845-4061>),
   F. Hoffmann-La Roche AG [cph, fnd]
 Maintainer: Szymon Maksymiuk <sz.maksymiuk@gmail.com>
 Repository: CRAN
-Date/Publication: 2025-04-29 09:50:02 UTC
+Date/Publication: 2025-06-10 04:10:02 UTC
