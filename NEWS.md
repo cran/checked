@@ -1,35 +1,8 @@
-# checked (0.2.9)
+# checked 0.5.0
 
-* Add `igraph_subgraph_from_edges` wrapper to used work around deprecation
-  messages and alternate between `igraph::subgraph.edges` and 
-  `igraph::subgraph_from_edges` depending on the `igraph` version.
-  
-* Address CRAN results issues
+* Entire package refactor
 
-* In `install_packages_process` use `withCallingHandlers` instead
-  of the `tryCatch` to prevent accidental interruptions if `install.packages()`
-  triggers a benign warning.
-
-# checked 0.2.8
-
-* Unify notes, warnings and errors are internally stored when generating
-  results (R4.5 compatibility)
-  
-# checked 0.2.7
-
-* Fix a bug where wrong lib.loc was used to derive whether a package has already
-  been satisfied.
-  
-# checked 0.2.6
-
-* Save minimal version required by each edge and use them to properly identify
-  whether dependecy is satisfied when calling `task_graph_update_done`
-
-# checked 0.2.5
-
-* Refine reverse suggested dependecy strategy.
-
-# checked 0.2.4
+# checked 0.2.3
 
 * Fix check processes hanging forever in some system configurations.
 
@@ -46,15 +19,11 @@
 
 * Add tests for the reverse dependency check use case.
 
-* Make `install_packages_process` capture session's `available_packages_filters`
+* Make `install_process` capture session's `available_packages_filters`
   and reuse them when installing packages to ensure consistency with the main
   session filtering.
 
 * Prettify output by stripping excessive new lines.
-
-* `checked` now depends on `options`
-
-* Expose `...` allowing customization of check subprocesses when creating checks df.
 
 * Force garbage collection before scheduling task, to make sure any already
   finished processes are removed from the memory.
